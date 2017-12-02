@@ -40,10 +40,14 @@
           state: started
           enabled: yes
 
+      - name: Pause for Jenkins servcie to start
+        pause:
+          seconds: 30
+
       - name: Get Jenkins admin password
         shell: cat /var/lib/jenkins/secrets/initialAdminPassword
         register: jenkins_admin_password
 
       - name: Output password to user
         debug:
-          msg: "The administrator password for Jekins is {{ jenkins_admin_password.stdout }}" 
+          msg: "The administrator password for Jekins is {{ jenkins_admin_password.stdout }}"
