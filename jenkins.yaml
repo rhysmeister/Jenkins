@@ -129,11 +129,24 @@
         become: no
 
       - name: Ensure jenkins plugins are installed
-        shell: "sudo java -jar /var/cache/jenkins/war/WEB-INF/jenkins-cli.jar -s http://127.0.0.1:8080/ -auth admin:{{ jenkins_admin_password.stdout }} install-plugin {{ item }} && touch {{ item }}.success"
+        shell: "sudo java -jar /var/cache/jenkins/war/WEB-INF/jenkins-cli.jar -s http://127.0.0.1:8080/ -auth admin:{{ jenkins_admin_password.stdout }} install-plugin {{ item }} && touch installed_plugins/{{ item }}.success"
         args:
           creates: "installed_plugins/{{ item }}.success"
         with_items:
           - "{{ jenkins_plugins }}"
+        register: plugins
+        become: no
+
+      - name: Restart jenkins if required
+        service:
+          name: jenkins
+          state: restarted
+        when: plugins.changed
+
+      - name: Ensure jenkins admin user has been created
+        script: scripts/create_admin_user.sh
+        args:
+          creates: jenkins_admin_user.success
         become: no
 
       - name: Output password to user
