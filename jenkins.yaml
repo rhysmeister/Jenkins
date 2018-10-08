@@ -122,10 +122,6 @@
         shell: cat /var/lib/jenkins/secrets/initialAdminPassword
         register: jenkins_admin_password
 
-      - name: Output password to user
-        debug:
-          msg: "The administrator password for Jekins is {{ jenkins_admin_password.stdout }}"
-
       - name: Ensure installed_plugins directory exists
         file:
           name: installed_plugins
@@ -139,3 +135,7 @@
         with_items:
           - "{{ jenkins_plugins }}"
         become: no
+
+      - name: Output password to user
+        debug:
+          msg: "The administrator password for Jekins is {{ jenkins_admin_password.stdout }}"
