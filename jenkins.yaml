@@ -61,7 +61,9 @@
           seconds: 30
 
       - name: Get Jenkins admin password
-        shell: cat /var/lib/jenkins/secrets/initialAdminPassword
+        shell: cat /var/lib/jenkins/secrets/initialAdminPassword && rm /var/lib/jenkins/secrets/initialAdminPassword
+        args:
+          removes: /var/lib/jenkins/secrets/initialAdminPassword
         register: jenkins_admin_password
 
       - name: Ensure installed_plugins directory exists
