@@ -6,13 +6,29 @@
     vars:
       jenkins_repo_url: http://pkg.jenkins.io/redhat
       jenkins_gpg_key_url: https://pkg.jenkins.io/redhat/jenkins.io.key
-      java_package: java-1.8.0-openjdk.x86_64
+      java_packages:
+        - java-1.8.0-openjdk.x86_64
+        - java-1.8.0-openjdk-devel
+      global_tools:
+        - git
+        - docker
+        - docker-devel
+        - docker-latest
+        - docker-common
+        - docker-client-latest
+        - docker-client
+        - docker-unit-test
 
     tasks:
 
       - name: Install Java
         yum:
-          name: "{{ java_package }}"
+          name: "{{ java_packages }}"
+          state: present
+
+      - name: Install Jenkins Global Tools
+        yum:
+          name: "{{ global_tools }}"
           state: present
 
       - name: Add Jenkins yum repo
