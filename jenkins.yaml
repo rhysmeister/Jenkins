@@ -12,12 +12,13 @@
       global_tools:
         - git
         - docker
-        - docker-devel
         - docker-latest
         - docker-common
         - docker-client-latest
         - docker-client
-        - docker-unit-test
+        - unzip # required for jenkins plugin install script
+        - python-virtualenv
+      no_log: false
 
     tasks:
 
@@ -39,11 +40,18 @@
           gpgcheck: yes
           gpgkey: "{{ jenkins_gpg_key_url }}"
 
+      - name: Ensure firewalld is started
+        service:
+          name: firewalld
+          state: started
+          enabled: yes
+
       - name: Open Jenkins port
         firewalld:
           port: 8080/tcp
           permanent: true
           state: enabled
+          immediate: true
 
       - name: Install Jenkins
         yum:
@@ -61,10 +69,12 @@
           seconds: 30
 
       - name: Get Jenkins admin password
-        shell: cat /var/lib/jenkins/secrets/initialAdminPassword && rm /var/lib/jenkins/secrets/initialAdminPassword
-        args:
-          removes: /var/lib/jenkins/secrets/initialAdminPassword
+        shell: cat /var/lib/jenkins/secrets/initialAdminPassword
+        #&& rm /var/lib/jenkins/secrets/initialAdminPassword
+        #args:
+        #  removes: /var/lib/jenkins/secrets/initialAdminPassword
         register: jenkins_admin_password
+        no_log: "{{ no_log }}"
 
       - name: Ensure installed_plugins directory exists
         file:
@@ -72,18 +82,57 @@
           state: directory
         become: no
 
-      - name: Load jenkins_repo_url
-        include_vars:
-          file: vars/jenkins_plugins.yml
+      - name: Ensure /usr/bin/scripts directory exists
+        file:
+          path: /usr/bin/scripts
+          state: directory
+          mode: 0755
+          owner: root
+          group: root
 
-      - name: Ensure jenkins plugins are installed
-        shell: "sudo java -jar /var/cache/jenkins/war/WEB-INF/jenkins-cli.jar -s http://127.0.0.1:8080/ -auth admin:{{ jenkins_admin_password.stdout }} install-plugin {{ item }} && touch installed_plugins/{{ item }}.success"
+      #- name: Ensure jenkins plugins are installed
+      #  shell: "sudo java -jar /var/cache/jenkins/war/WEB-INF/jenkins-cli.jar -s http://127.0.0.1:8080/ -auth admin:{{ jenkins_admin_password.stdout }} install-plugin {{ item }} && touch installed_plugins/{{ item }}.success"
+      #  args:
+      #    creates: "installed_plugins/{{ item }}.success"
+      #  with_items:
+      #    - "{{ jenkins_plugins }}"
+      #  register: plugins
+      #  become: no
+      #  no_log: "{{ no_log }}"
+      - name: Ensure jenkins-support script is on host
+        copy:
+          src: jenkins-support
+          dest: /usr/local/bin/jenkins-support
+          mode: 0500
+          owner: root
+          group: root
+
+      - name: Ensure installed_plugins.sh script is on host
+        copy:
+          src: install_plugins.sh
+          dest: /usr/bin/scripts/install_plugins.sh
+          mode: 0500
+          owner: root
+          group: root
+
+      - name: Copy plugins file to host
+        copy:
+          src: jenkins_plugins.txt
+          dest: /usr/bin/scripts/jenkins_plugins.txt
+          mode: 0444
+          owner: root
+          group: root
+
+      # Fails often. See https://github.com/jenkinsci/docker/issues/440
+      # Reason given by geerlingguy seems correct. Multiple runs may be required
+      - name: Install Jenkins Plugins
+        shell: /usr/bin/scripts/install_plugins.sh < /usr/bin/scripts/jenkins_plugins.txt && touch jenkins_plugins.success
         args:
-          creates: "installed_plugins/{{ item }}.success"
-        with_items:
-          - "{{ jenkins_plugins }}"
+          creates: jenkins_plugins.success
+        environment:
+          JENKINS_UC: https://updates.jenkins.io
         register: plugins
-        become: no
+        ignore_errors: true # TODO FIx this
 
       - name: Restart jenkins if required
         service:
@@ -92,7 +141,7 @@
         when: plugins.changed
 
       - name: Ensure jenkins admin user has been created
-        script: scripts/create_admin_user.sh
+        script: files/create_admin_user.sh
         args:
           creates: jenkins_admin_user.success
         become: no
@@ -100,3 +149,28 @@
       - name: Output password to user
         debug:
           msg: "The administrator password for Jekins is {{ jenkins_admin_password.stdout }}"
+
+      - name: Ensure virtualbox yum repo is available
+        yum_repository:
+          name: virtualbox
+          description: "Oracle Linux / RHEL / CentOS-$releasever / $basearch - VirtualBox"
+          baseurl: http://download.virtualbox.org/virtualbox/rpm/el/$releasever/$basearch
+          enabled: yes
+          gpgcheck: yes
+          repo_gpgcheck: yes
+          gpgkey: https://www.virtualbox.org/download/oracle_vbox.asc
+        register: vb_repo
+
+      - name: Clean yum cache
+        shell: yum clean all
+        when: vb_repo.changed
+
+      - name: Install virtualbox
+        yum:
+          name: VirtualBox-6.0
+          state: latest
+
+      - name: Setup ansible/molecule virtualenv
+        pip:
+          name: [ ansible, molecule, docker, python-vagrant ]
+          virtualenv: /opt/molecule_venv
