@@ -6,7 +6,7 @@ Vagrant.configure("2") do |config|
     vb.customize [
       "modifyvm", :id,
       "--name", "jenkins",
-      "--memory", "4096"
+      "--memory", "8192"
     ]
   end
 
