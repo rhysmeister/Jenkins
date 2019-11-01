@@ -18,6 +18,8 @@
         - docker-client
         - unzip # required for jenkins plugin install script
         - python-virtualenv
+      vagrant_url: https://releases.hashicorp.com/vagrant/2.2.6/vagrant_2.2.6_x86_64.rpm
+      vagrant_shasum256: ed6e2741b80d82d58cfe2ce182360a964cee60245de050183cf0bef4917e8b27
       no_log: false
 
     tasks:
@@ -174,3 +176,19 @@
         pip:
           name: [ ansible, molecule, docker, python-vagrant ]
           virtualenv: /opt/molecule_venv
+
+      - name: Download vagrant rpm
+        get_url:
+          url: "{{ vagrant_url }}"
+          dest: /root
+          checksum: sha256:{{ vagrant_shasum256 }}
+
+      - name: Install vagrant rpm using yum
+        yum:
+          name: "/root/{{ vagrant_url | basename }}"
+
+      - name: Add jenkins user to vboxusers group
+        user:
+          name: jenkins
+          groups: vboxusers
+          append: yes
