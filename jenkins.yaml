@@ -1,5 +1,5 @@
 ---
-
+  # TODO - Need ot enable docker API for call form jenkins to work. Manually done on host but not here!
   - hosts: all
     become: yes
 
@@ -174,7 +174,12 @@
 
       - name: Setup ansible/molecule virtualenv
         pip:
-          name: [ ansible, molecule, docker, python-vagrant ]
+          name: [ "ansible",
+                  "molecule",
+                  "docker",
+                  "python-vagrant",
+                  "molecule[docker]",
+                  "selinux" ]
           virtualenv: /opt/molecule_venv
 
       - name: Download vagrant rpm
@@ -183,12 +188,30 @@
           dest: /root
           checksum: sha256:{{ vagrant_shasum256 }}
 
+      - name: Ensure docker is started
+        service:
+          name: docker
+          state: started
+          enabled: yes
+
       - name: Install vagrant rpm using yum
         yum:
           name: "/root/{{ vagrant_url | basename }}"
 
+      - name: Ensure docker group exists
+        group:
+          name: docker
+
+      - name: Ensure docker user exists
+        user:
+          name: docker
+          group: docker
+
       - name: Add jenkins user to vboxusers group
         user:
           name: jenkins
-          groups: vboxusers
+          groups: "{{ item }}"
           append: yes
+        with_items:
+          - vboxusers
+          - docker
